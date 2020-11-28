@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid px-0">
-    <loading :active="isLoading" :is-full-page="true" :opacity="0.7">
+    <loading :active="spinner.fullscreen" :is-full-page="true" :opacity="0.7">
       <slot name="default">
         <span class="h3"><i class="fas fa-spinner fa-spin text-info"></i></span>
       </slot>
@@ -36,22 +36,20 @@ import * as faceapi from 'face-api.js';
 import db from '../db/firebase';
 
 export default {
-  // firebase: {
-  //   float32array: db.ref('/members'),
-  // },
   data() {
     return {
       deviceId: '',
       cameras: [],
       errorMessage: '',
-      isLoading: false,
+      spinner: { fullscreen: false },
       float32array: {},
+      labels: [],
       firstDownload: true,
     };
   },
   methods: {
     async loadModel() {
-      // this.isLoading = true;
+      this.spinner.fullscreen = true;
       await Promise.all([
         faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
         faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
@@ -83,20 +81,25 @@ export default {
       );
     },
     async onVideoLive(bind = true) {
-      if (bind && this.firstDownload) {
-        console.log('active');
-        await this.$rtdbBind('float32array', db.ref('/members'));
-        this.firstDownload = false;
+      const vm = this;
+      vm.spinner.fullscreen = true;
+      console.log(vm.spinner.fullscreen);
+      if (bind && vm.firstDownload) {
+        await vm.$rtdbBind('float32array', db.ref('/members'));
+        vm.firstDownload = false;
       }
       const webcam = document.querySelector('#webcam');
       const canvasDom = document.querySelector('canvas');
       const canvas = faceapi.createCanvasFromMedia(webcam);
       const canvasSize = { width: webcam.clientWidth, height: webcam.clientHeight };
       faceapi.matchDimensions(canvas, canvasSize);
+      // reset canvas
       if (canvasDom) document.querySelector('.overlay').removeChild(canvasDom);
       document.querySelector('.overlay').appendChild(canvas);
-      const labels = await this.loadLabels();
-      console.log(labels);
+      // load labels
+      vm.labels = await vm.loadLabels();
+      vm.spinner.fullscreen = false;
+      console.log(vm.spinner.fullscreen);
       // start
       setInterval(async () => {
         const detections = await faceapi
@@ -104,17 +107,36 @@ export default {
           .withFaceLandmarks()
           .withFaceDescriptors();
         const resizeDetections = faceapi.resizeResults(detections, canvasSize);
-        const faceMatcher = new faceapi.FaceMatcher(labels, 0.6);
-        const results = resizeDetections.map((d) => faceMatcher.findBestMatch(d.descriptor));
         canvas.getContext('2d').clearRect(0, 0, canvasSize.width, canvasSize.height);
-        faceapi.draw.drawDetections(canvas, resizeDetections);
-        resizeDetections.forEach(() => {
+        let results = [];
+        if (vm.labels.length > 0) {
+          const faceMatcher = new faceapi.FaceMatcher(vm.labels, 0.4);
+          results = resizeDetections.map((d) => faceMatcher.findBestMatch(d.descriptor));
+        }
+        // faceapi.draw.drawDetections(canvas, resizeDetections);
+        resizeDetections.forEach((detection) => {
+          const { score } = detection.detection;
+          new faceapi.draw.DrawBox(
+            {
+              x: detection.detection.box.x,
+              y: detection.detection.box.y,
+              width: detection.detection.box.width,
+              height: detection.detection.box.height,
+            },
+            { boxColor: '#17a2b8' },
+          ).draw(canvas);
+          new faceapi.draw.DrawTextField(
+            [`${Math.ceil(score * 100) / 100}`],
+            detection.detection.box.bottomLeft,
+            { backgroundColor: '#17a2b8' },
+          ).draw(canvas);
           results.forEach((result, index) => {
             const { box } = resizeDetections[index].detection;
             const { label, distance } = result;
             new faceapi.draw.DrawTextField(
               [`${label} (${parseInt(distance * 100, 10)})`],
               box.bottomRight,
+              { backgroundColor: '#17a2b8' },
             ).draw(canvas);
           });
         });
@@ -123,10 +145,10 @@ export default {
   },
   watch: {
     float32array() {
-      if (!this.firstDownload) this.onVideoLive(false);
-      // if (Object.keys(oldValue).length > 0) {
-      //   this.onVideoLive(false);
-      // }
+      if (!this.firstDownload) {
+        // console.log('watch active');
+        this.onVideoLive(false);
+      }
     },
   },
   created() {
