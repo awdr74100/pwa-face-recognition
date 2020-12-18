@@ -80,14 +80,15 @@ export default {
         const resizeDetections = faceapi.resizeResults(detections, canvasSize);
         canvas.getContext('2d').clearRect(0, 0, canvasSize.width, canvasSize.height);
         // recognition
-        let boxDistance = 0;
+        const distanceArray = [];
         if (labels.length > 0) {
           const faceMatcher = new faceapi.FaceMatcher(labels, 0.35);
           const results = resizeDetections.map((d) => faceMatcher.findBestMatch(d.descriptor));
           results.forEach((result, index) => {
             const { box } = resizeDetections[index].detection;
             const { label, distance } = result;
-            boxDistance = distance;
+            distanceArray[index] = distance;
+            // boxDistance = distance;
             new faceapi.draw.DrawTextField(
               [`${label} (${parseInt(distance * 100, 10)})`],
               box.bottomRight,
@@ -96,7 +97,7 @@ export default {
           });
         }
         // detection
-        resizeDetections.forEach((detection) => {
+        resizeDetections.forEach((detection, index) => {
           // const score = Math.ceil(detection.detection.score * 100) / 100;
           new faceapi.draw.DrawBox(
             {
@@ -105,7 +106,7 @@ export default {
               width: detection.detection.box.width,
               height: detection.detection.box.height,
             },
-            { boxColor: boxDistance < 0.35 ? '#20c997' : '#6c757d' },
+            { boxColor: distanceArray[index] < 0.35 ? '#20c997' : '#6c757d' },
           ).draw(canvas);
           // new faceapi.draw.DrawTextField([`${score}`], detection.detection.box.bottomLeft, {
           //   backgroundColor: score > 0.85 ? '#20c997' : '#6c757d',

@@ -12,6 +12,10 @@ module.exports = {
   },
   pwa: {
     name: 'Recognition',
+    themeColor: '#20c997',
+    msTileColor: '#000000',
+    appleMobileWebAppCapable: 'yes',
+    appleMobileWebAppStatusBarStyle: 'black',
     workboxOptions: {
       exclude: [/\.map$/, /_redirects/],
     },
