@@ -106,7 +106,7 @@ export default {
               width: detection.detection.box.width,
               height: detection.detection.box.height,
             },
-            { boxColor: distanceArray[index] < 0.35 ? '#20c997' : '#6c757d' },
+            { boxColor: (distanceArray[index] || 1) < 0.35 ? '#20c997' : '#6c757d' },
           ).draw(canvas);
           // new faceapi.draw.DrawTextField([`${score}`], detection.detection.box.bottomLeft, {
           //   backgroundColor: score > 0.85 ? '#20c997' : '#6c757d',
